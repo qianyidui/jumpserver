@@ -20,9 +20,6 @@ class AuthBook(AssetUser):
         'assets.Asset', on_delete=models.CASCADE, verbose_name=_('Asset')
     )
 
-    class Meta:
-        get_latest_by = 'date_created'
-
     @classmethod
     def get_latest_item_by_username_asset(cls, username, asset):
         try:
@@ -33,3 +30,9 @@ class AuthBook(AssetUser):
             )
             item = None
         return item
+
+    class Meta:
+        get_latest_by = 'date_created'
+
+    def __str__(self):
+        return '{}@{}'.format(self.username, self.asset)

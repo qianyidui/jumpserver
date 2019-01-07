@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework_bulk import BulkModelViewSet
 from rest_framework.pagination import LimitOffsetPagination
 
-from common.utils import get_logger
+from common.utils import get_logger, get_object_or_none
 from common.permissions import IsOrgAdmin, IsOrgAdminOrAppUser
 from ..models import SystemUser, Asset
 from .. import serializers
@@ -30,7 +31,7 @@ from ..tasks import push_system_user_to_assets_manual, \
 
 logger = get_logger(__file__)
 __all__ = [
-    'SystemUserViewSet', 'SystemUserAuthInfoApi',
+    'SystemUserViewSet', 'SystemUserAuthInfoApi', 'SystemUserAssetAuthInfoApi',
     'SystemUserPushApi', 'SystemUserTestConnectiveApi',
     'SystemUserAssetsListView', 'SystemUserPushToAssetApi',
     'SystemUserTestAssetConnectivityApi', 'SystemUserCommandFilterRuleListApi',
@@ -52,6 +53,29 @@ class SystemUserViewSet(BulkModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset().all()
         return queryset
+
+
+class SystemUserAssetAuthInfoApi(generics.RetrieveAPIView):
+    """
+    Get system user with asset auth info (Mainly for Authbook)
+    """
+    queryset = SystemUser.objects.all()
+    permission_classes = (IsOrgAdminOrAppUser,)
+    serializer_class = serializers.SystemUserAuthSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        data = self.get_serializer_data()
+        return Response(data)
+
+    def get_serializer_data(self):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        aid = self.kwargs.get('aid')
+        asset = get_object_or_none(Asset, pk=aid)
+        data = copy.deepcopy(serializer.data)
+        password = instance.get_password(asset)
+        data.update({'password': password})
+        return data
 
 
 class SystemUserAuthInfoApi(generics.RetrieveUpdateDestroyAPIView):

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
@@ -21,7 +22,7 @@ from rest_framework_bulk import BulkModelViewSet
 from rest_framework.pagination import LimitOffsetPagination
 
 from common.mixins import IDInFilterMixin
-from common.utils import get_logger
+from common.utils import get_logger, get_object_or_none
 from ..hands import IsOrgAdmin
 from ..models import AdminUser, Asset
 from .. import serializers
@@ -31,7 +32,7 @@ from ..tasks import test_admin_user_connectivity_manual
 logger = get_logger(__file__)
 __all__ = [
     'AdminUserViewSet', 'ReplaceNodesAdminUserApi',
-    'AdminUserTestConnectiveApi', 'AdminUserAuthApi',
+    'AdminUserTestConnectiveApi', 'AdminUserAuthApi', 'AdminUserAssetAuthApi',
     'AdminUserAssetsListView',
 ]
 
@@ -51,6 +52,29 @@ class AdminUserViewSet(IDInFilterMixin, BulkModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset().all()
         return queryset
+
+
+class AdminUserAssetAuthApi(generics.RetrieveAPIView):
+    """
+    Get admin user with asset auth info (Mainly for Authbook)
+    """
+    queryset = AdminUser.objects.all()
+    serializer_class = serializers.AdminUserAuthSerializer
+    permission_classes = (IsOrgAdmin,)
+
+    def retrieve(self, request, *args, **kwargs):
+        data = self.get_serializer_data()
+        return Response(data)
+
+    def get_serializer_data(self):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        aid = self.kwargs.get('aid')
+        asset = get_object_or_none(Asset, pk=aid)
+        data = copy.deepcopy(serializer.data)
+        password = instance.get_password(asset)
+        data.update({'password': password})
+        return data
 
 
 class AdminUserAuthApi(generics.UpdateAPIView):
