@@ -43,6 +43,21 @@ class AssetUser(OrgModelMixin):
         else:
             return None
 
+    def get_password(self, asset=None):
+        from .authbook import AuthBook
+        item = None
+
+        if asset is not None:
+            item = AuthBook.get_latest_item_by_username_asset(self.username, asset)
+
+        if asset is None or item is None:
+            item = self
+
+        if item is not self and item.date_created < self.date_updated:
+            item = self
+
+        return item.password
+
     @password.setter
     def password(self, password_raw):
         raise AttributeError("Using set_auth do that")
