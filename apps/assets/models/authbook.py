@@ -27,7 +27,9 @@ class AuthBook(AssetUser):
     def get_latest_item_by_username_asset(cls, username, asset):
         try:
             item = AuthBook.objects.filter(username=username, asset=asset).latest()
-            return item
-        except Exception as e:
-            logger.debug(e)
-            return None
+        except AuthBook.DoesNotExist as e:
+            logger.debug(
+                'msg: {} (username: {}, asset: {})'.format(e, username, asset)
+            )
+            item = None
+        return item

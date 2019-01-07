@@ -43,6 +43,11 @@ class AssetUser(OrgModelMixin):
         else:
             return None
 
+    @password.setter
+    def password(self, password_raw):
+        raise AttributeError("Using set_auth do that")
+        # self._password = signer.sign(password_raw)
+
     def get_password(self, asset=None):
         from .authbook import AuthBook
         item = None
@@ -57,11 +62,6 @@ class AssetUser(OrgModelMixin):
             item = self
 
         return item.password
-
-    @password.setter
-    def password(self, password_raw):
-        raise AttributeError("Using set_auth do that")
-        # self._password = signer.sign(password_raw)
 
     @property
     def private_key(self):
