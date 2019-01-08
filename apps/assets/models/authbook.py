@@ -31,6 +31,15 @@ class AuthBook(AssetUser):
             item = None
         return item
 
+    @classmethod
+    def create_item(cls, username, password, asset):
+        obj = cls.objects.create(
+            name='{}@{}'.format(username, asset), username=username,
+            asset=asset
+        )
+        obj.set_auth(password=password)
+        return obj
+
     class Meta:
         get_latest_by = 'date_created'
 

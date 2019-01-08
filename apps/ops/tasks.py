@@ -1,7 +1,10 @@
 # coding: utf-8
 from celery import shared_task, subtask
+from django.utils.translation import ugettext as _
+from django.utils import timezone
 
-from common.utils import get_logger, get_object_or_none
+
+from common.utils import get_logger, get_object_or_none, encrypt_password
 from .celery.utils import register_as_period_task, after_app_shutdown_clean
 from .models import Task, CommandExecution
 
@@ -59,3 +62,52 @@ def hello(name, callback=None):
 def hello_callback(result):
     print(result)
     print("Hello callback")
+
+
+def get_change_asset_password_tasks(username, password):
+    tasks = list()
+    tasks.append({
+        'name': 'Change {} password'.format(username),
+        'action': {
+            'module': 'user',
+            'args': 'name={} password={} update_password=always'.format(
+                username, encrypt_password(password, salt="K3mIlKK")
+            ),
+        }
+    })
+    return tasks
+
+
+@shared_task
+def change_asset_password(username, assets, org_id, history, task_name):
+    from assets.tasks import clean_hosts, const
+    from assets.models import AuthBook
+    from common.utils import random_password_gen
+    from .utils import update_or_create_ansible_task
+
+    password = random_password_gen()
+    tasks = get_change_asset_password_tasks(username, password)
+    hosts = clean_hosts(assets)
+    if not hosts:
+        return {}
+    task, created = update_or_create_ansible_task(
+        task_name=task_name, hosts=hosts, tasks=tasks, pattern='all',
+        options=const.TASK_OPTIONS, run_as_admin=True,
+        created_by=org_id,
+    )
+    result = task.run()
+
+    summary = result[1]
+    contacted = summary.get('contacted')
+    if contacted:
+        for hostname in contacted.keys():
+            asset = assets.filter(hostname=hostname).first()
+            AuthBook.create_item(
+                username=username, password=password, asset=asset
+            )
+
+    history.result = summary
+    history.is_finished = True
+    history.date_finished = timezone.now()
+    history.save()
+    return result
